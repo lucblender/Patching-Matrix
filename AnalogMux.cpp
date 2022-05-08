@@ -25,14 +25,14 @@ void AnalogMux::selectMuxPin(int pin)
   Serial.print(this->selectPins[0]);
   Serial.print(" selectedOut ");
   Serial.println(this->selectedOut);
-  if(pin == -1)
+  if(pin == 255)
   {
     this->selectedOut = pin;
     digitalWrite(this->EN, HIGH);
   }
   if (pin > 7) 
   {
-    this->selectedOut = -1;
+    this->selectedOut = 255;
     return; // Exit if pin is out of scope
   }
   

@@ -20,7 +20,7 @@ class AnalogMux{
   private:
   int selectPins[3] = {0,0,0};
   int EN = 0;
-  int selectedOut = -1;
+  int selectedOut = 255;
 
   
 };
