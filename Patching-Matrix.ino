@@ -1,6 +1,9 @@
 
 #include "AnalogMux.h"
 #include <EEPROM.h>
+#include <Wire.h>
+
+#include "grove_alphanumeric_display.h"
 
 #include "Adafruit_NeoTrellis.h"
 
@@ -18,10 +21,33 @@ Adafruit_NeoTrellis trellis;
 #define BAUD_RATE         115200
 
 int programValue = 0;
-int oldProgramValue = 0;
+int oldProgramValue = -1;
 
 bool showProgram = false;
 int showProgramCounter = 0;
+
+Seeed_Digital_Tube tube;
+
+// Keeps track of the current stage of tube 2's animation.
+int currentSegment = 0;
+
+// The frames of tube 2's animation.
+uint16_t tubeTwoFrames[] = {
+    SEGMENT_TOP,
+    SEGMENT_TOP_LEFT,
+    SEGMENT_TOP_LEFT_DIAGONAL,
+    SEGMENT_TOP_VERTICAL,
+    SEGMENT_TOP_RIGHT_DIAGONAL,
+    SEGMENT_TOP_RIGHT,
+    SEGMENT_MIDDLE_LEFT,
+    SEGMENT_MIDDLE_RIGHT,
+    SEGMENT_BOTTOM_LEFT,
+    SEGMENT_BOTTOM_LEFT_DIAGONAL,
+    SEGMENT_BOTTOM_VERTICAL,
+    SEGMENT_BOTTOM_RIGHT_DIAGONAL,
+    SEGMENT_BOTTOM_RIGHT,
+    SEGMENT_BOTTOM
+};
 
 AnalogMux *mux0;
 AnalogMux *mux1;
@@ -61,11 +87,7 @@ TrellisCallback blink(keyEvent evt) {
 
   if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
     int line = evt.bit.NUM / 4;
-    Serial.println(evt.bit.NUM);
-    Serial.println(evt.bit.NUM % 4);
-    Serial.println(line);
     AnalogMux *mux;
-    Serial.print("Clearing :");
     if (line == 0)
       mux = mux0;
     if (line == 1)
@@ -100,6 +122,16 @@ void setup() {
 
   Serial.begin(BAUD_RATE);
 
+  Wire.begin();
+  // If using four digital tubes, use this configuration.
+  tube.setTubeType(TYPE_2, TYPE_2_DEFAULT_I2C_ADDR);
+
+  // If using two digital tubes, use this configuration.
+  // tube.setTubeType(TYPE_2,TYPE_2_DEFAULT_I2C_ADDR);
+
+  tube.setBrightness(15);
+  tube.setBlinkRate(BLINK_OFF);
+
   pinMode(READ_BTN, INPUT_PULLUP);
   pinMode(WRITE_BTN, INPUT_PULLUP);
 
@@ -119,14 +151,6 @@ void setup() {
     loadValue(i);
   }
 
-  for (int i = 0; i < 8; i++) {
-    for (int j = 0; j < 4; j++) {
-      Serial.print(arrayValue[i][j]);
-    }
-    Serial.println("");
-
-  }
-
   pinMode(INT_PIN, INPUT);
 
   if (!trellis.begin()) {
@@ -136,7 +160,6 @@ void setup() {
   else {
     Serial.println("trellis started");
   }
-
   //activate all keys and set callbacks
   for (int i = 0; i < NEO_TRELLIS_NUM_KEYS; i++) {
     trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
@@ -148,8 +171,13 @@ void setup() {
   for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
     trellis.pixels.setPixelColor(i, Wheel(map(i, 0, trellis.pixels.numPixels(), 0, 255)));
     trellis.pixels.show();
+    tube.clearBuf();
+    displayTubeTwo();
+    tube.display();
     delay(50);
   }
+  
+  tube.displayString("LX");
   for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
     trellis.pixels.setPixelColor(i, 0x000000);
     trellis.pixels.show();
@@ -164,15 +192,18 @@ void selectRead() {
 
   if (programValue != oldProgramValue)
   {
-    showProgram = true; 
+    tube.clearBuf();
+    char toDisplay [2]= {'P', programValue+48};
+    tube.setTubeSingleChar(FIRST_TUBE,'P');
+    tube.setTubeSingleNum(SECOND_TUBE,programValue);    
+    tube.display();
+    showProgram = true;
     showProgramCounter = 0;
     Serial.print("Showing program n° ");
     Serial.println(programValue);
   }
   oldProgramValue = programValue;
 }
-
-
 
 void saveValue(int program) {
   arrayValue[program][0] = mux0->getSelectedOut();
@@ -184,12 +215,12 @@ void saveValue(int program) {
   }
 }
 
-void writeCurrentProgram(){
+void writeCurrentProgram() {
   mux0->selectMuxPin(arrayValue[programValue][0]);
   mux1->selectMuxPin(arrayValue[programValue][1]);
   mux2->selectMuxPin(arrayValue[programValue][2]);
   mux3->selectMuxPin(arrayValue[programValue][3]);
-  
+
   currentValue[0] = mux0->getSelectedOut();
   currentValue[1] = mux1->getSelectedOut();
   currentValue[2] = mux2->getSelectedOut();
@@ -239,6 +270,26 @@ void light() {
   trellis.pixels.show();
 }
 
+void displayTubeOne() {
+    // To display specific segments add together their values.
+    tube.setTubeSegments(FIRST_TUBE, SEGMENT_TOP + SEGMENT_BOTTOM);
+}
+
+// Display an animation going through all 14 segments in turn.
+void displayTubeTwo() {
+    // Increment tube 2's animation frame.
+    currentSegment += 1;
+
+    // Restart the animation if it has finished.
+    if (currentSegment >= 14) {
+        currentSegment = 0;
+    }
+
+    // Display the current frame of tube 2's animation.
+    tube.setTubeSegments(FIRST_TUBE, tubeTwoFrames[currentSegment]);
+    tube.setTubeSegments(SECOND_TUBE, tubeTwoFrames[currentSegment]);
+}
+
 void loop() {
   // put your main code here, to run repeatedly:
   //for(int i = 0; i<4; i++)
@@ -252,14 +303,18 @@ void loop() {
   if (!digitalRead(READ_BTN)) {
     Serial.println("A");
     saveValue(programValue);
-    Serial.println("SaveCurrentProgram");    
+    Serial.println("SaveCurrentProgram");
+    oldProgramValue = -1;
+    tube.displayString("sv",0);
     light();
     delay(500);
   }
 
   if (!digitalRead(WRITE_BTN)) {
     writeCurrentProgram();
-    Serial.println("WriteCurrentProgram");    
+    Serial.println("WriteCurrentProgram");
+    oldProgramValue = -1;
+    tube.displayString("ld",0);
     light();
     delay(500);
 
