@@ -33,32 +33,35 @@ int currentSegment = 0;
 
 // The frames of tube 2's animation.
 uint16_t tubeTwoFrames[] = {
-    SEGMENT_TOP,
-    SEGMENT_TOP_LEFT,
-    SEGMENT_TOP_LEFT_DIAGONAL,
-    SEGMENT_TOP_VERTICAL,
-    SEGMENT_TOP_RIGHT_DIAGONAL,
-    SEGMENT_TOP_RIGHT,
-    SEGMENT_MIDDLE_LEFT,
-    SEGMENT_MIDDLE_RIGHT,
-    SEGMENT_BOTTOM_LEFT,
-    SEGMENT_BOTTOM_LEFT_DIAGONAL,
-    SEGMENT_BOTTOM_VERTICAL,
-    SEGMENT_BOTTOM_RIGHT_DIAGONAL,
-    SEGMENT_BOTTOM_RIGHT,
-    SEGMENT_BOTTOM
+  SEGMENT_TOP,
+  SEGMENT_TOP_LEFT,
+  SEGMENT_TOP_LEFT_DIAGONAL,
+  SEGMENT_TOP_VERTICAL,
+  SEGMENT_TOP_RIGHT_DIAGONAL,
+  SEGMENT_TOP_RIGHT,
+  SEGMENT_MIDDLE_LEFT,
+  SEGMENT_MIDDLE_RIGHT,
+  SEGMENT_BOTTOM_LEFT,
+  SEGMENT_BOTTOM_LEFT_DIAGONAL,
+  SEGMENT_BOTTOM_VERTICAL,
+  SEGMENT_BOTTOM_RIGHT_DIAGONAL,
+  SEGMENT_BOTTOM_RIGHT,
+  SEGMENT_BOTTOM
 };
+
+#define MUX_NUMBER 4
+#define PROGRAM_NUMBER 8
 
 AnalogMux *mux0;
 AnalogMux *mux1;
 AnalogMux *mux2;
 AnalogMux *mux3;
 
-//AnalogMux * muxs[4] = {mux0, mux1, mux2, mux3};
+AnalogMux * muxs[MUX_NUMBER];
 
-int currentValue [4] = {255, 255, 255, 255};
+int currentValue [MUX_NUMBER] = {255, 255, 255, 255};
 
-int arrayValue[8][4] = {
+int arrayValue[PROGRAM_NUMBER][MUX_NUMBER] = {
   {0, 1, 2, 3},
   {0, 1, 2, 3},
   {0, 1, 2, 3},
@@ -87,31 +90,18 @@ TrellisCallback blink(keyEvent evt) {
 
   if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
     int line = evt.bit.NUM / 4;
-    AnalogMux *mux;
-    if (line == 0)
-      mux = mux0;
-    if (line == 1)
-      mux = mux1;
-    if (line == 2)
-      mux = mux2;
-    if (line == 3)
-      mux = mux3;
 
-    if (mux->getSelectedOut() == evt.bit.NUM % 4)
-      mux->selectMuxPin(255);
+    if (muxs[line]->getSelectedOut() == evt.bit.NUM % 4)
+      muxs[line]->selectMuxPin(255);
     else {
-      mux->selectMuxPin(evt.bit.NUM % 4);
+      muxs[line]->selectMuxPin(evt.bit.NUM % 4);
     }
 
-    currentValue[0] = mux0->getSelectedOut();
-    currentValue[1] = mux1->getSelectedOut();
-    currentValue[2] = mux2->getSelectedOut();
-    currentValue[3] = mux3->getSelectedOut();
-
-    //trellis.pixels.setPixelColor(evt.bit.NUM, Wheel(map(evt.bit.NUM, 0, trellis.pixels.numPixels(), 0, 255))); //on rising
+    for (int i = 0; i < MUX_NUMBER; i++)
+    {
+      currentValue[i] = muxs[i]->getSelectedOut();
+    }
   }
-  //else if(evt.bit.EDGE == SEESAW_KEYPAD_EDGE_FALLING)
-  //  trellis.pixels.setPixelColor(evt.bit.NUM, 0); //off falling
 
   trellis.pixels.show();
   return 0;
@@ -140,12 +130,12 @@ void setup() {
   mux2 = new AnalogMux(12, 14, 16, 10);
   mux3 = new AnalogMux(13, 15, 17, 11);
 
-  mux0->selectMuxPin(255);
-  mux1->selectMuxPin(255);
-  mux2->selectMuxPin(255);
-  mux3->selectMuxPin(255);
+  muxs[0] = mux0;
+  muxs[1] = mux1;
+  muxs[2] = mux2;
+  muxs[3] = mux3;
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < PROGRAM_NUMBER; i++) {
     // uncomment only one time to setup
     //saveValue(i);
     loadValue(i);
@@ -176,7 +166,7 @@ void setup() {
     tube.display();
     delay(50);
   }
-  
+
   tube.displayString("LX");
   for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
     trellis.pixels.setPixelColor(i, 0x000000);
@@ -193,9 +183,9 @@ void selectRead() {
   if (programValue != oldProgramValue)
   {
     tube.clearBuf();
-    char toDisplay [2]= {'P', programValue+48};
-    tube.setTubeSingleChar(FIRST_TUBE,'P');
-    tube.setTubeSingleNum(SECOND_TUBE,programValue);    
+    char toDisplay [2] = {'P', programValue + 48};
+    tube.setTubeSingleChar(FIRST_TUBE, 'P');
+    tube.setTubeSingleNum(SECOND_TUBE, programValue);
     tube.display();
     showProgram = true;
     showProgramCounter = 0;
@@ -206,37 +196,35 @@ void selectRead() {
 }
 
 void saveValue(int program) {
-  arrayValue[program][0] = mux0->getSelectedOut();
-  arrayValue[program][1] = mux1->getSelectedOut();
-  arrayValue[program][2] = mux2->getSelectedOut();
-  arrayValue[program][3] = mux3->getSelectedOut();
-  for (int i = 0; i < 4; i++) {
-    EEPROM.write(program * 4 + i, arrayValue[program][i]);
+  for (int i = 0; i < MUX_NUMBER; i++)
+  {
+    arrayValue[program][i] = muxs[i]->getSelectedOut();
+  }
+  for (int i = 0; i < MUX_NUMBER; i++) {
+    EEPROM.write(program * MUX_NUMBER + i, arrayValue[program][i]);
   }
 }
 
 void writeCurrentProgram() {
-  mux0->selectMuxPin(arrayValue[programValue][0]);
-  mux1->selectMuxPin(arrayValue[programValue][1]);
-  mux2->selectMuxPin(arrayValue[programValue][2]);
-  mux3->selectMuxPin(arrayValue[programValue][3]);
 
-  currentValue[0] = mux0->getSelectedOut();
-  currentValue[1] = mux1->getSelectedOut();
-  currentValue[2] = mux2->getSelectedOut();
-  currentValue[3] = mux3->getSelectedOut();
+  for (int i = 0; i < MUX_NUMBER; i++) {
+    muxs[i]->selectMuxPin(arrayValue[programValue][i]);
+  }
+  for (int i = 0; i < MUX_NUMBER; i++) {
+    currentValue[i] = muxs[i]->getSelectedOut();
+  }
 }
 
 void loadValue(int program) {
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < MUX_NUMBER; i++) {
     arrayValue[program][i] = EEPROM.read (program * 4 + i);
   }
 }
 
 void lightProgram(int program) {
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < MUX_NUMBER; i++) {
     if (arrayValue[program][i] != 255) {
-      trellis.pixels.setPixelColor(i * 4 + arrayValue[program][i], trellis.pixels.Color(0, 128, 0)); //on rising
+      trellis.pixels.setPixelColor(i * MUX_NUMBER + arrayValue[program][i], trellis.pixels.Color(0, 128, 0)); //on rising
     }
   }
   trellis.pixels.show();
@@ -245,14 +233,14 @@ void lightProgram(int program) {
 void light() {
   int g = 0;
   int r = 0;
-  for (int line = 0; line < 4; line++) {
-    for (int i = 0; i < 4; i++) {
-      trellis.pixels.setPixelColor(i + line * 4, 0); //on rising}
+  for (int line = 0; line < MUX_NUMBER; line++) {
+    for (int i = 0; i < MUX_NUMBER; i++) {
+      trellis.pixels.setPixelColor(i + line * MUX_NUMBER, 0); //on rising}
     }
   }
-  for (int line = 0; line < 4; line++) {
+  for (int line = 0; line < MUX_NUMBER; line++) {
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < MUX_NUMBER; i++) {
       g = 0;
       r = 0;
       if (showProgram == true) {
@@ -263,7 +251,7 @@ void light() {
       if (currentValue[line] == i) {
         r = 128;
       }
-      trellis.pixels.setPixelColor(i + line * 4, trellis.pixels.Color(r, g, 0)); //on rising
+      trellis.pixels.setPixelColor(i + line * MUX_NUMBER, trellis.pixels.Color(r, g, 0)); //on rising
     }
   }
 
@@ -271,41 +259,33 @@ void light() {
 }
 
 void displayTubeOne() {
-    // To display specific segments add together their values.
-    tube.setTubeSegments(FIRST_TUBE, SEGMENT_TOP + SEGMENT_BOTTOM);
+  // To display specific segments add together their values.
+  tube.setTubeSegments(FIRST_TUBE, SEGMENT_TOP + SEGMENT_BOTTOM);
 }
 
 // Display an animation going through all 14 segments in turn.
 void displayTubeTwo() {
-    // Increment tube 2's animation frame.
-    currentSegment += 1;
+  // Increment tube 2's animation frame.
+  currentSegment += 1;
 
-    // Restart the animation if it has finished.
-    if (currentSegment >= 14) {
-        currentSegment = 0;
-    }
+  // Restart the animation if it has finished.
+  if (currentSegment >= 14) {
+    currentSegment = 0;
+  }
 
-    // Display the current frame of tube 2's animation.
-    tube.setTubeSegments(FIRST_TUBE, tubeTwoFrames[currentSegment]);
-    tube.setTubeSegments(SECOND_TUBE, tubeTwoFrames[currentSegment]);
+  // Display the current frame of tube 2's animation.
+  tube.setTubeSegments(FIRST_TUBE, tubeTwoFrames[currentSegment]);
+  tube.setTubeSegments(SECOND_TUBE, tubeTwoFrames[currentSegment]);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  //for(int i = 0; i<4; i++)
-  //{
-  //  mux0->selectMuxPin(i);
-  //  Serial.print("Selecting output n° ");
-  //  Serial.println(i);
-  //  delay(10000);
-  //}
 
   if (!digitalRead(READ_BTN)) {
     Serial.println("A");
     saveValue(programValue);
     Serial.println("SaveCurrentProgram");
     oldProgramValue = -1;
-    tube.displayString("sv",0);
+    tube.displayString("SV", 0);
     light();
     delay(500);
   }
@@ -314,7 +294,7 @@ void loop() {
     writeCurrentProgram();
     Serial.println("WriteCurrentProgram");
     oldProgramValue = -1;
-    tube.displayString("ld",0);
+    tube.displayString("ld", 0);
     light();
     delay(500);
 
