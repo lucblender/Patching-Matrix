@@ -7,7 +7,19 @@
 
 #include "Adafruit_NeoTrellis.h"
 
-Adafruit_NeoTrellis trellis;
+#define Y_DIM 8 //number of rows of key
+#define X_DIM 8 //number of columns of keys
+
+//create a matrix of trellis panels
+Adafruit_NeoTrellis t_array[Y_DIM/4][X_DIM/4] = {
+  
+  { Adafruit_NeoTrellis(0x2E), Adafruit_NeoTrellis(0x2F) },
+
+  { Adafruit_NeoTrellis(0x30), Adafruit_NeoTrellis(0x31) }
+  
+};
+
+Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM/4, X_DIM/4);
 
 #define INT_PIN 22
 
@@ -49,39 +61,43 @@ uint16_t tubeTwoFrames[] = {
   SEGMENT_BOTTOM
 };
 
-#define MUX_NUMBER 4
+#define MUX_NUMBER 8
 #define PROGRAM_NUMBER 8
 
 AnalogMux *mux0;
 AnalogMux *mux1;
 AnalogMux *mux2;
 AnalogMux *mux3;
+AnalogMux *mux4;
+AnalogMux *mux5;
+AnalogMux *mux6;
+AnalogMux *mux7;
 
 AnalogMux * muxs[MUX_NUMBER];
 
-int currentValue [MUX_NUMBER] = {255, 255, 255, 255};
+int currentValue [MUX_NUMBER] = {255, 255, 255, 255, 255, 255, 255, 255};
 
 int arrayValue[PROGRAM_NUMBER][MUX_NUMBER] = {
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
-  {0, 1, 2, 3},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
+  {0, 1, 2, 3, 4, 5, 6, 7},
 };
 
 // Input a value 0 to 255 to get a color value.
 // The colors are a transition r - g - b - back to r.
 uint32_t Wheel(byte WheelPos) {
   if (WheelPos < 85) {
-    return trellis.pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+    return seesaw_NeoPixel::Color(WheelPos * 3, 255 - WheelPos * 3, 0);
   } else if (WheelPos < 170) {
     WheelPos -= 85;
-    return trellis.pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+    return seesaw_NeoPixel::Color(255 - WheelPos * 3, 0, WheelPos * 3);
   } else {
     WheelPos -= 170;
-    return trellis.pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+    return seesaw_NeoPixel::Color(0, WheelPos * 3, 255 - WheelPos * 3);
   }
 }
 
@@ -89,12 +105,12 @@ uint32_t Wheel(byte WheelPos) {
 TrellisCallback blink(keyEvent evt) {
 
   if (evt.bit.EDGE == SEESAW_KEYPAD_EDGE_RISING) {
-    int line = evt.bit.NUM / 4;
+    int line = evt.bit.NUM / MUX_NUMBER;
 
-    if (muxs[line]->getSelectedOut() == evt.bit.NUM % 4)
+    if (muxs[line]->getSelectedOut() == evt.bit.NUM % MUX_NUMBER)
       muxs[line]->selectMuxPin(255);
     else {
-      muxs[line]->selectMuxPin(evt.bit.NUM % 4);
+      muxs[line]->selectMuxPin(evt.bit.NUM % MUX_NUMBER);
     }
 
     for (int i = 0; i < MUX_NUMBER; i++)
@@ -103,7 +119,7 @@ TrellisCallback blink(keyEvent evt) {
     }
   }
 
-  trellis.pixels.show();
+  trellis.show();
   return 0;
 }
 
@@ -129,11 +145,19 @@ void setup() {
   mux1 = new AnalogMux(5, 7, 9, 3);
   mux2 = new AnalogMux(12, 14, 16, 10);
   mux3 = new AnalogMux(13, 15, 17, 11);
+  mux4 = new AnalogMux(13, 15, 17, 11);
+  mux5 = new AnalogMux(13, 15, 17, 11);
+  mux6 = new AnalogMux(13, 15, 17, 11);
+  mux7 = new AnalogMux(13, 15, 17, 11);
 
   muxs[0] = mux0;
   muxs[1] = mux1;
   muxs[2] = mux2;
   muxs[3] = mux3;
+  muxs[4] = mux4;
+  muxs[5] = mux5;
+  muxs[6] = mux6;
+  muxs[7] = mux7;
 
   for (int i = 0; i < PROGRAM_NUMBER; i++) {
     // uncomment only one time to setup
@@ -151,27 +175,26 @@ void setup() {
     Serial.println("trellis started");
   }
   //activate all keys and set callbacks
-  for (int i = 0; i < NEO_TRELLIS_NUM_KEYS; i++) {
+  for (int i = 0; i < Y_DIM*X_DIM; i++) {
     trellis.activateKey(i, SEESAW_KEYPAD_EDGE_RISING);
     trellis.activateKey(i, SEESAW_KEYPAD_EDGE_FALLING);
     trellis.registerCallback(i, blink);
   }
 
   //do a little animation to show we're on
-  for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
-    trellis.pixels.setPixelColor(i, Wheel(map(i, 0, trellis.pixels.numPixels(), 0, 255)));
-    trellis.pixels.show();
+  for (uint16_t i = 0; i < Y_DIM*X_DIM; i++) {
+    trellis.setPixelColor(i, Wheel(map(i, 0, Y_DIM*X_DIM, 0, 255)));
+    trellis.show();
     tube.clearBuf();
     displayTubeTwo();
     tube.display();
-    delay(50);
   }
 
   tube.displayString("LX");
-  for (uint16_t i = 0; i < trellis.pixels.numPixels(); i++) {
-    trellis.pixels.setPixelColor(i, 0x000000);
-    trellis.pixels.show();
-    delay(50);
+  for (uint16_t i = 0; i < Y_DIM*X_DIM; i++) {
+    trellis.setPixelColor(i, 0x000000);
+    trellis.show();
+    delay(25);
   }
 
 
@@ -217,17 +240,17 @@ void writeCurrentProgram() {
 
 void loadValue(int program) {
   for (int i = 0; i < MUX_NUMBER; i++) {
-    arrayValue[program][i] = EEPROM.read (program * 4 + i);
+    arrayValue[program][i] = EEPROM.read (program * MUX_NUMBER + i);
   }
 }
 
 void lightProgram(int program) {
   for (int i = 0; i < MUX_NUMBER; i++) {
     if (arrayValue[program][i] != 255) {
-      trellis.pixels.setPixelColor(i * MUX_NUMBER + arrayValue[program][i], trellis.pixels.Color(0, 128, 0)); //on rising
+      trellis.setPixelColor(i * MUX_NUMBER + arrayValue[program][i], seesaw_NeoPixel::Color(0, 128, 0)); //on rising
     }
   }
-  trellis.pixels.show();
+  trellis.show();
 }
 
 void light() {
@@ -235,7 +258,7 @@ void light() {
   int r = 0;
   for (int line = 0; line < MUX_NUMBER; line++) {
     for (int i = 0; i < MUX_NUMBER; i++) {
-      trellis.pixels.setPixelColor(i + line * MUX_NUMBER, 0); //on rising}
+      trellis.setPixelColor(i + line * MUX_NUMBER, 0); //on rising}
     }
   }
   for (int line = 0; line < MUX_NUMBER; line++) {
@@ -251,11 +274,11 @@ void light() {
       if (currentValue[line] == i) {
         r = 128;
       }
-      trellis.pixels.setPixelColor(i + line * MUX_NUMBER, trellis.pixels.Color(r, g, 0)); //on rising
+      trellis.setPixelColor(i + line * MUX_NUMBER, seesaw_NeoPixel::Color(r, g, 0)); //on rising
     }
   }
 
-  trellis.pixels.show();
+  trellis.show();
 }
 
 void displayTubeOne() {
@@ -301,14 +324,14 @@ void loop() {
   }
 
   if (!digitalRead(INT_PIN)) {
-    trellis.read(false);
+    trellis.read();
   }
 
   selectRead();
 
   if (showProgram == true) {
     showProgramCounter++;
-    if (showProgramCounter > 100) {
+    if (showProgramCounter > 50) {
       showProgram = false;
       Serial.println("showProgram = false;");
       showProgramCounter = 0;
