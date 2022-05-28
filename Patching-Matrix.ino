@@ -23,11 +23,10 @@ Adafruit_MultiTrellis trellis((Adafruit_NeoTrellis *)t_array, Y_DIM/4, X_DIM/4);
 
 #define INT_PIN 22
 
-#define EN 2
-#define SELECT_INPUT A14
+#define SELECT_INPUT A0
 
-#define WRITE_BTN 32
-#define READ_BTN 34
+#define WRITE_BTN 34  
+#define READ_BTN 36
 
 
 #define BAUD_RATE         115200
@@ -141,14 +140,14 @@ void setup() {
   pinMode(READ_BTN, INPUT_PULLUP);
   pinMode(WRITE_BTN, INPUT_PULLUP);
 
-  mux0 = new AnalogMux(4, 6, 8, 2);
-  mux1 = new AnalogMux(5, 7, 9, 3);
-  mux2 = new AnalogMux(12, 14, 16, 10);
-  mux3 = new AnalogMux(13, 15, 17, 11);
-  mux4 = new AnalogMux(13, 15, 17, 11);
-  mux5 = new AnalogMux(13, 15, 17, 11);
-  mux6 = new AnalogMux(13, 15, 17, 11);
-  mux7 = new AnalogMux(13, 15, 17, 11);
+  mux0 = new AnalogMux(8, 6, 4, 2);
+  mux1 = new AnalogMux(9, 7, 5, 3);
+  mux2 = new AnalogMux(16, 14, 12, 10);
+  mux3 = new AnalogMux(17, 15, 13, 11);
+  mux4 = new AnalogMux(61, 59, 57, 55);
+  mux5 = new AnalogMux(62, 60, 58, 56);
+  mux6 = new AnalogMux(69, 67, 65, 63);
+  mux7 = new AnalogMux(32, 68, 66, 64);
 
   muxs[0] = mux0;
   muxs[1] = mux1;
@@ -201,7 +200,7 @@ void setup() {
 }
 
 void selectRead() {
-  programValue = analogRead(SELECT_INPUT) / 128;
+  programValue = 7-analogRead(SELECT_INPUT) / 128;
 
   if (programValue != oldProgramValue)
   {
